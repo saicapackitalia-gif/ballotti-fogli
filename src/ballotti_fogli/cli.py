@@ -9,8 +9,9 @@ import sys
 import cv2
 import yaml
 
-from .calibration import calibrate_from_reference, load_calibration, save_calibration
+from .calibration import calibrate_from_reference, homography_from_quad, load_calibration, save_calibration
 from .counting import count_sheets
+from .reference_detection import ReferenceNotFoundError, detect_reference_quad
 
 
 def _pick_two_points(image, window_title: str) -> list[tuple[int, int]]:
@@ -86,6 +87,18 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--auto-a4",
+        action="store_true",
+        help=(
+            "Calibrazione robusta a foto storte/in diagonale: individua automaticamente "
+            "i 4 angoli di un foglio A4 nella foto e calcola una rettifica prospettica "
+            "(omografia) invece di un singolo rapporto mm/pixel. Da preferire quando non "
+            "si puo' garantire uno scatto perfettamente perpendicolare. In alternativa a "
+            "--ref-length-mm/--calibration-file; non si combina con --rows o "
+            "--save-calibration (la rettifica va ricalcolata ad ogni foto)."
+        ),
+    )
+    parser.add_argument(
         "--calibration-file",
         help=(
             "Percorso di una calibrazione salvata in precedenza (vedi --save-calibration). "
@@ -100,10 +113,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if not args.calibration_file and args.ref_length_mm is None:
+    if args.auto_a4:
+        if args.ref_length_mm is not None or args.calibration_file or args.save_calibration or args.rows != 1:
+            print(
+                "Errore: --auto-a4 non si combina con --ref-length-mm, --calibration-file, "
+                "--save-calibration o --rows.",
+                file=sys.stderr,
+            )
+            return 1
+    elif not args.calibration_file and args.ref_length_mm is None:
         print(
-            "Errore: specificare --ref-length-mm (calibrazione manuale) oppure "
-            "--calibration-file (postazione fissa gia' calibrata).",
+            "Errore: specificare --ref-length-mm (calibrazione manuale), --calibration-file "
+            "(postazione fissa gia' calibrata) oppure --auto-a4 (rettifica prospettica).",
             file=sys.stderr,
         )
         return 1
@@ -131,7 +152,33 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    if args.calibration_file:
+    if args.auto_a4:
+        ref_a, ref_b = _pick_two_points(
+            image,
+            "Rettifica prospettica: click sui 2 angoli OPPOSTI approssimativi del foglio A4 "
+            "(basta indicare l'area, non serve precisione)",
+        )
+        margin = 40
+        x1, x2 = sorted((ref_a[0], ref_b[0]))
+        y1, y2 = sorted((ref_a[1], ref_b[1]))
+        roi = (
+            max(x1 - margin, 0),
+            max(y1 - margin, 0),
+            min(x2 + margin, image.shape[1]),
+            min(y2 + margin, image.shape[0]),
+        )
+        try:
+            quad = detect_reference_quad(image, roi)
+        except ReferenceNotFoundError as exc:
+            print(f"Errore: {exc}", file=sys.stderr)
+            return 1
+
+        calibration = homography_from_quad(quad.corners_px)
+        print(
+            f"Foglio A4 rilevato: rapporto lati misurato {quad.measured_ratio:.3f} "
+            f"(atteso {quad.expected_ratio:.3f}, scarto {quad.ratio_error_pct:.1f}%)"
+        )
+    elif args.calibration_file:
         calibration = load_calibration(args.calibration_file)
         print(
             f"Uso calibrazione salvata da {args.calibration_file} "

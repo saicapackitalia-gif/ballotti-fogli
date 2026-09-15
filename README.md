@@ -104,8 +104,12 @@ al dato di commessa su un campione di prova prima di fidarsene.
 - **Riferimento di scala nella foto**: un oggetto di lunghezza nota (righello,
   target stampato, distanziale) nello stesso piano della testata del
   ballotto. Senza calibrazione pixel→mm ogni misura di altezza è arbitraria.
-- **Camera perpendicolare** alla superficie fotografata: la prospettiva
+- **Camera ragionevolmente perpendicolare** alla superficie fotografata se si
+  usa la calibrazione semplice (`--ref-length-mm`/`--rows`): la prospettiva
   (foto in diagonale) distorce le distanze e introduce errore sistematico.
+  La modalità `--auto-a4` (§6, Modalità C) rilassa molto questo vincolo:
+  corregge la distorsione prospettica invece di ignorarla, quindi tollera
+  foto scattate storte/in angolo — vedi i test reali in §4.
 - **Illuminazione uniforme e messa a fuoco**: ombre dure o foto mosse
   peggiorano molto il metodo per conteggio righe.
 - **Altezze medie per profilo d'onda misurate da voi**: già inserite in
@@ -118,25 +122,51 @@ al dato di commessa su un campione di prova prima di fidarsene.
 
 ```
 src/ballotti_fogli/
-  calibration.py   # calcolo mm/pixel da due punti di riferimento noti
-  linecount.py      # rilevamento righe/creste onda lungo un profilo 1D
-  counting.py       # combina calibrazione + spessore medio + conteggio righe
-  cli.py            # interfaccia a riga di comando (selezione punti a click)
+  calibration.py           # Calibration (mm/px scalare) e PlaneCalibration (omografia)
+  reference_detection.py   # rilevamento automatico del foglio A4 (per PlaneCalibration)
+  linecount.py             # rilevamento righe/creste onda lungo un profilo 1D
+  counting.py              # combina calibrazione + spessore medio + conteggio righe
+  cli.py                   # interfaccia a riga di comando (selezione punti a click)
 config/
   flute_profiles.example.yaml   # template da copiare e compilare con i vostri dati
 tests/
   test_calibration.py
   test_linecount.py
+samples/
+  README.md   # tabella di confronto tra stime e misure reali sulle foto di test
 ```
 
-## 4. Limiti noti / incertezze (da leggere prima di fidarsi del numero)
+## 4. Limiti noti / incertezze, e cosa dicono i test su foto reali finora
 
-- Non è stato validato su foto reali di ballotti: questo è un algoritmo di
-  riferimento, non un modello già tarato sul vostro prodotto.
-- Il metodo per conteggio righe può fallire silenziosamente su onde molto
-  sottili (E/F) o pile molto alte con molte righe ravvicinate: in quei casi
-  fidatevi di più del metodo per divisione, ma tenete presente il suo limite
-  (dipende dallo spessore medio, non dal foglio reale).
+Il prototipo è stato testato su 5 foto reali fornite dall'azienda (vedi
+`samples/README.md` per il dettaglio completo). Risultati:
+
+- **Metodo per divisione, foto con camera quasi perpendicolare**: errore di
+  altezza dello 0,6% (onda EB) — molto buono.
+- **Metodo per divisione, foto con angolo di ripresa marcato (foglio A4
+  visibilmente trapezoidale)**: con la calibrazione scalare semplice
+  l'errore sale al -10,6% (onda C). Con la rettifica prospettica automatica
+  (`--auto-a4`, Modalità C) lo stesso scatto scende a **-2,2%** — la
+  correzione della prospettiva funziona, ma non elimina completamente
+  l'errore (restano a incidere l'imprecisione nel cliccare i bordi della
+  fila e possibili distorsioni ottiche dell'obiettivo, non corrette da
+  un'omografia). Su una foto già quasi perpendicolare, invece, la rettifica
+  prospettica può essere leggermente **peggiore** dello scalare semplice
+  (5,4% contro 0,6% su EB): l'omografia è più sensibile a piccole
+  imprecisioni nel rilevare i 4 angoli del foglio quando c'è poca vera
+  prospettiva da correggere. **Indicazione pratica**: usare `--auto-a4`
+  quando la foto è visibilmente storta/in diagonale; per scatti già ben
+  frontali la calibrazione scalare va bene così.
+- **2 foto su 5 non erano misurabili**: bordo superiore della fila fuori
+  inquadratura (confermato verificando che la texture del cartone arriva
+  fino al bordo immagine senza soluzione di continuità). Nessuna
+  calibrazione, per quanto accurata, può recuperare un'altezza non
+  fotografata: va sempre verificato che l'intera fila entri nell'inquadratura.
+- **Il metodo per conteggio righe sovrastima sistematicamente su tutti i
+  casi reali testati finora** (dal +17% al +43%). Non è un problema di
+  soglie da regolare fine: l'algoritmo di rilevamento picchi va rivisto.
+  **Allo stato attuale non è affidabile**: usate il metodo per divisione
+  come stima principale.
 - La reggetta che stringe il ballotto comprime leggermente i fogli vicino
   alla legatura: l'altezza misurata lì non è rappresentativa dell'altezza
   "a riposo" usata per calibrare lo spessore medio.
@@ -145,8 +175,9 @@ tests/
   presa da un operatore, almeno nella fase di validazione iniziale.
 - Prima di usare i numeri per aggiustare bolle, fatture o giacenze di
   magazzino, fate una campagna di confronto tra conteggio manuale e
-  automatico su un campione rappresentativo di ballotti (altezze e profili
-  diversi) per misurare l'errore reale nel vostro contesto.
+  automatico su un campione più ampio per misurare l'errore reale nel
+  vostro contesto — 5 foto bastano per una prima validazione, non per
+  certificare l'accuratezza del sistema.
 
 ## 5. Installazione
 
@@ -195,6 +226,40 @@ python -m ballotti_fogli.cli foto_ballotto.jpg \
 Stessa procedura della A1, ma al primo click si indicano i due estremi di
 un oggetto di riferimento (es. un righello da 100 mm) invece dei bordi
 della fila.
+
+### Modalità C — rettifica prospettica automatica (foto storte/in diagonale)
+
+Da usare quando non potete garantire uno scatto perfettamente frontale
+(es. operatore che scatta a mano, in fretta, da un'angolazione qualunque).
+Richiede un foglio A4 appoggiato accanto alla fila, sullo stesso piano del
+taglio:
+
+```bash
+python -m ballotti_fogli.cli foto_ballotto.jpg \
+    --profile C \
+    --auto-a4
+```
+
+Lo script apre due finestre interattive:
+1. cliccate **due angoli approssimativi opposti** del foglio A4 (basta
+   indicare l'area, non serve precisione: il programma poi trova da solo
+   i 4 angoli esatti dentro quella zona);
+2. cliccate il punto in alto e il punto in basso della fila di fogli da
+   contare.
+
+A differenza delle modalità A1/A2 (un solo rapporto mm/pixel), qui il
+programma calcola una trasformazione prospettica completa dai 4 angoli del
+foglio, che corregge la distorsione dovuta all'inclinazione della camera,
+non solo la scala. Se il foglio rilevato ha proporzioni troppo diverse da
+un A4 vero (oltre l'8%, es. per una ROI troppo larga che include anche
+l'etichetta), il programma si ferma con un errore invece di calibrare in
+modo silenziosamente sbagliato.
+
+**Quando conviene rispetto a A1/A2**: se la foto è visibilmente storta (il
+foglio A4 appare come un trapezio, non un rettangolo), questa modalità
+riduce sensibilmente l'errore (vedi §4). Se la foto è già ben frontale, non
+dà benefici certi e può essere leggermente meno precisa della calibrazione
+scalare semplice: usatela quando serve, non come default automatico.
 
 ### Modalità B — postazione fissa (solo se in futuro disponibile)
 
