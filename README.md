@@ -49,41 +49,55 @@ immagine.
 
 Opzioni concrete, in ordine di praticità per un contesto industriale:
 
-1. **Postazione fissa (consigliata)** — montare il telefono su una staffa/
-   cavalletto a distanza e angolo costanti dal ballotto. Si calibra
-   **una sola volta** (foto con un riferimento noto, es. un righello) e da
-   quel momento ogni foto scattata dalla stessa postazione riusa lo stesso
-   rapporto mm/pixel, **senza bisogno di riferimento ad ogni scatto**. È
-   l'opzione più economica e affidabile, ed è già supportata nel prototipo
-   (vedi `--save-calibration` / `--calibration-file` in §6). Limite: se
-   qualcuno sposta il telefono, cambia lo zoom o l'inquadratura, la
-   calibrazione salvata non è più valida e va rifatta.
+1. **Larghezza di taglio nota della commessa (consigliata nel vostro caso)**
+   — le foto non vengono scattate da una postazione fissa, quindi la
+   calibrazione va rifatta ad ogni scatto. Non serve però portare un
+   oggetto fisico di riferimento: se la foto inquadra per intero la
+   larghezza della fila (i due bordi laterali), e quella larghezza è un
+   dato già noto dalla commessa/ordine di produzione, si può usare
+   **quella stessa larghezza come riferimento**, cliccando i due bordi
+   laterali invece degli estremi di un righello. Zero oggetti da portare o
+   posizionare. È già supportato nel prototipo (vedi §6) usando
+   `--ref-length-mm` con il valore della larghezza di commessa e cliccando
+   i bordi laterali della fila invece che un oggetto esterno.
+   **Attenzione**: vale solo se quella larghezza è affidabile nella foto
+   specifica — misuratela in un punto dove la pila è ben squadrata (es.
+   alla base, dove il peso allinea i fogli), non in un punto dove i fogli
+   sono visibilmente sfalsati o rigonfi, altrimenti la larghezza apparente
+   non corrisponde più al dato di commessa.
 
-2. **Riferimento fisso nell'inquadratura, rilevato automaticamente** — es.
-   un marker stampato (tipo ArUco/QR) attaccato vicino al ballotto,
-   rilevato via software invece che cliccato a mano. Toglie il click
-   manuale ma richiede comunque un oggetto fisico di riferimento in ogni
-   foto; non è ancora implementato in questo prototipo (vedi §7).
+2. **Riferimento fisico portato ad ogni scatto** (righello, foglio A4,
+   tessera) — da usare se la larghezza della fila non è sempre visibile per
+   intero o non è abbastanza affidabile. Stesso meccanismo di calibrazione
+   dell'opzione 1, cambia solo cosa si clicca. Anche questa già supportata
+   in §6.
 
-3. **API di realtà aumentata dello smartphone (ARKit su iOS, ARCore su
+3. **Postazione fissa** — utile solo se in futuro si rendesse disponibile
+   un punto di scatto fisso (staffa/cavalletto): la calibrazione andrebbe
+   fatta una sola volta invece che ad ogni foto (vedi `--save-calibration`
+   / `--calibration-file` in §6). Non applicabile al vostro flusso attuale,
+   dato che le foto non sono scattate da un punto fisso.
+
+4. **Riferimento fisso nell'inquadratura, rilevato automaticamente** — es.
+   un marker stampato (tipo ArUco/QR) rilevato via software invece che
+   cliccato a mano. Toglie il click manuale ma richiede comunque un
+   oggetto fisico in ogni foto; non è ancora implementato in questo
+   prototipo (vedi §7).
+
+5. **API di realtà aumentata dello smartphone (ARKit su iOS, ARCore su
    Android)** — usano fusione di camera + sensori di movimento (e, sugli
    iPhone Pro con LiDAR, un sensore di profondità dedicato) per stimare
-   distanze reali senza marker fisico. Precisione: buona (ordine del mm-cm)
-   sui modelli con LiDAR, più incerta (cm) sui modelli che usano solo
-   visual-inertial odometry. Richiede però di sviluppare un'app nativa
-   (Swift/Kotlin) invece di un semplice upload foto, quindi è un impegno
-   di sviluppo maggiore rispetto alle opzioni 1-2.
+   distanze reali senza marker fisico né posizione fissa. Precisione: buona
+   (ordine del mm-cm) sui modelli con LiDAR, più incerta (cm) sui modelli
+   che usano solo visual-inertial odometry. Richiede però di sviluppare
+   un'app nativa (Swift/Kotlin) invece di un semplice upload foto, quindi
+   è un impegno di sviluppo nettamente maggiore.
 
-4. **Dimensione nota e costante del ballotto/pallet stesso** (es. se i
-   pallet o la larghezza di taglio dei fogli sono sempre standard in
-   azienda) — si potrebbe usare quella dimensione orizzontale come
-   riferimento implicito invece di un marker fisico. Fattibile ma dipende
-   dal fatto che quella dimensione sia davvero sempre costante e ben
-   visibile nella foto.
-
-**Raccomandazione pratica**: per un primo rollout in produzione, l'opzione 1
-(postazione fissa con calibrazione una tantum) dà il miglior rapporto tra
-affidabilità e sforzo di sviluppo, ed è quella già cablata nel prototipo.
+**Raccomandazione pratica per il vostro caso**: dato che non avete una
+postazione fissa, l'opzione 1 (larghezza di commessa come riferimento) è la
+più conveniente perché non richiede nessun oggetto fisico aggiuntivo — a
+patto di validare che la larghezza apparente nella foto corrisponda davvero
+al dato di commessa su un campione di prova prima di fidarsene.
 
 ## 2. Requisiti indispensabili per un risultato utilizzabile
 
@@ -147,7 +161,30 @@ pip install -r requirements.txt
 `config/flute_profiles.yaml` contiene già le altezze medie fornite
 dall'azienda (B, E, C, EB, BC); aggiornatelo se cambiano.
 
-### Modalità A — calibrazione manuale ad ogni foto
+### Modalità A1 — larghezza di commessa come riferimento (consigliata per voi)
+
+Se la foto inquadra per intero la larghezza della fila e conoscete la
+larghezza di taglio della commessa (es. 800 mm):
+
+```bash
+python -m ballotti_fogli.cli foto_ballotto.jpg \
+    --profile C \
+    --ref-length-mm 800
+```
+
+Lo script apre due finestre interattive:
+1. cliccate i **due bordi laterali della fila** (non un oggetto esterno) —
+   la larghezza nota di commessa fa da riferimento per calibrare mm/pixel;
+2. cliccate il punto in alto e il punto in basso della fila di fogli da
+   contare.
+
+Va rifatto ad ogni foto (la calibrazione non si riusa da uno scatto
+all'altro), ma non richiede alcun oggetto fisico da portare o posizionare.
+
+### Modalità A2 — oggetto fisico di riferimento ad ogni foto
+
+Da usare quando la larghezza della fila non è visibile per intero o non è
+abbastanza affidabile in quello scatto:
 
 ```bash
 python -m ballotti_fogli.cli foto_ballotto.jpg \
@@ -155,13 +192,11 @@ python -m ballotti_fogli.cli foto_ballotto.jpg \
     --ref-length-mm 100
 ```
 
-Lo script apre due finestre interattive:
-1. cliccate i due estremi di un oggetto di riferimento di lunghezza nota
-   (es. un righello da 100 mm nella foto) per calibrare mm/pixel;
-2. cliccate il punto in alto e il punto in basso della fila di fogli da
-   contare.
+Stessa procedura della A1, ma al primo click si indicano i due estremi di
+un oggetto di riferimento (es. un righello da 100 mm) invece dei bordi
+della fila.
 
-### Modalità B — postazione fissa (consigliata, niente riferimento ad ogni scatto)
+### Modalità B — postazione fissa (solo se in futuro disponibile)
 
 Calibrazione una tantum, da rifare solo se si sposta la fotocamera:
 

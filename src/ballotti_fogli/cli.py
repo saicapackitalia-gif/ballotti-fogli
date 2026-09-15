@@ -61,7 +61,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--ref-length-mm",
         type=float,
-        help="Lunghezza reale in mm dell'oggetto di riferimento (richiesto se non si usa --calibration-file)",
+        help=(
+            "Lunghezza reale nota in mm da usare per calibrare, richiesto se non si usa "
+            "--calibration-file. Puo' essere un oggetto fisico di riferimento (righello, A4, "
+            "tessera) oppure, se visibile per intero nella foto, la larghezza di taglio nota "
+            "del foglio da commessa: in tal caso i due punti da cliccare in fase di "
+            "calibrazione sono i due bordi laterali della fila, non serve alcun oggetto fisico."
+        ),
     )
     parser.add_argument(
         "--calibration-file",
@@ -113,7 +119,11 @@ def main(argv: list[str] | None = None) -> int:
             "Valida solo se la foto e' dalla stessa postazione fissa usata per calibrare."
         )
     else:
-        ref_a, ref_b = _pick_two_points(image, "Calibrazione: click sui 2 estremi del riferimento")
+        ref_a, ref_b = _pick_two_points(
+            image,
+            "Calibrazione: click sui 2 bordi laterali della fila (larghezza nota) "
+            "oppure sui 2 estremi di un oggetto di riferimento",
+        )
         calibration = calibrate_from_reference(ref_a, ref_b, args.ref_length_mm)
         if args.save_calibration:
             save_calibration(
