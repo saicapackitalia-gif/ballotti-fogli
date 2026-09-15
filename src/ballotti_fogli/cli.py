@@ -66,7 +66,23 @@ def main(argv: list[str] | None = None) -> int:
             "--calibration-file. Puo' essere un oggetto fisico di riferimento (righello, A4, "
             "tessera) oppure, se visibile per intero nella foto, la larghezza di taglio nota "
             "del foglio da commessa: in tal caso i due punti da cliccare in fase di "
-            "calibrazione sono i due bordi laterali della fila, non serve alcun oggetto fisico."
+            "calibrazione sono i due bordi laterali del blocco fotografato, non serve alcun "
+            "oggetto fisico. Se nella foto sono legate insieme piu' file affiancate (es. 3 file "
+            "da 780 mm per ottimizzare il carico camion), passare qui la larghezza di UNA SOLA "
+            "fila e usare --rows per il numero di file, invece di calcolare voi il totale."
+        ),
+    )
+    parser.add_argument(
+        "--rows",
+        type=int,
+        default=1,
+        help=(
+            "Numero di file affiancate legate insieme nel blocco fotografato (default 1). "
+            "Se >1, --ref-length-mm deve essere la larghezza di UNA fila: il programma calcola "
+            "da solo la larghezza totale del blocco (ref-length-mm x rows) per calibrare sui "
+            "bordi esterni, cliccabili con certezza anche quando le file non hanno una cucitura "
+            "visibile tra loro. Richiede che le file abbiano tutte la stessa altezza (stesso "
+            "numero di fogli): verificatelo a vista prima di fidarvi del risultato."
         ),
     )
     parser.add_argument(
@@ -90,6 +106,10 @@ def main(argv: list[str] | None = None) -> int:
             "--calibration-file (postazione fissa gia' calibrata).",
             file=sys.stderr,
         )
+        return 1
+
+    if args.rows < 1:
+        print("Errore: --rows deve essere almeno 1.", file=sys.stderr)
         return 1
 
     config = load_flute_profiles(args.profiles_config)
@@ -119,17 +139,28 @@ def main(argv: list[str] | None = None) -> int:
             "Valida solo se la foto e' dalla stessa postazione fissa usata per calibrare."
         )
     else:
-        ref_a, ref_b = _pick_two_points(
-            image,
+        total_ref_length_mm = args.ref_length_mm * args.rows
+        window_title = (
             "Calibrazione: click sui 2 bordi laterali della fila (larghezza nota) "
-            "oppure sui 2 estremi di un oggetto di riferimento",
+            "oppure sui 2 estremi di un oggetto di riferimento"
+            if args.rows == 1
+            else f"Calibrazione: click sui 2 bordi ESTERNI del blocco ({args.rows} file affiancate)"
         )
-        calibration = calibrate_from_reference(ref_a, ref_b, args.ref_length_mm)
+        if args.rows > 1:
+            print(
+                f"Larghezza totale del blocco: {args.ref_length_mm:g} mm x {args.rows} file "
+                f"= {total_ref_length_mm:g} mm"
+            )
+        ref_a, ref_b = _pick_two_points(image, window_title)
+        calibration = calibrate_from_reference(ref_a, ref_b, total_ref_length_mm)
         if args.save_calibration:
             save_calibration(
                 calibration,
                 args.save_calibration,
-                notes=f"Calibrato da {args.image} con riferimento di {args.ref_length_mm} mm",
+                notes=(
+                    f"Calibrato da {args.image} con riferimento di {args.ref_length_mm} mm "
+                    f"x {args.rows} file = {total_ref_length_mm} mm"
+                ),
             )
             print(f"Calibrazione salvata in {args.save_calibration}")
 
