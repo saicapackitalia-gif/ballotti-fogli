@@ -17,10 +17,30 @@ vicino a 210/297 = 0,707).
 
 ## Foto caricate
 
-| File | Cliente | Profilo | Altezza reale fila (mm) | Fogli reali (fila singola) | Stima per divisione | Stima per conteggio righe | Note |
-|------|---------|---------|--------------------------|------------------------------|----------------------|------------------------------|------|
-| c9d645df...jfif | Biellese | BC | 1110 | 170 | 165 (con altezza corretta) / 150 (prima lettura, bordo superiore impreciso) | 199 | Metodo per divisione coerente con altezza vera; conteggio righe sovrastima, non ancora tarato |
-| 60038ca9...jfif | Princes Ready to Drink | B | — | — | — | — | Bordo superiore della fila fuori inquadratura: foto non misurabile per l'altezza |
-| _(SAMO, in arrivo)_ | SAMO | EB | 970 | | | | |
-| _(ICM, in arrivo)_ | ICM | B | 1180 | | | | |
-| _(SAMO, in arrivo)_ | SAMO | C | 1110 | | | | |
+| File | Cliente | Profilo | Altezza reale fila (mm) | Altezza misurata (mm) | Errore altezza | Stima per divisione | Stima per conteggio righe | Note |
+|------|---------|---------|--------------------------|-------------------------|----------------|----------------------|------------------------------|------|
+| SAMO - 970mm.jfif | SAMO | EB | 970 | 975,8 | **+0,6%** | 229 fogli | 326 fogli (+42% vs atteso) | Camera quasi perpendicolare: miglior risultato finora, valida il metodo di calibrazione A4 |
+| SAMO - 1110mm.jfif | SAMO | C | 1110 | 992,1 | -10,6% | 242 fogli | 345 fogli | Il foglio A4 appare visibilmente trapezoidale in foto (angolo di ripresa più marcato): probabile causa dell'errore maggiore sull'altezza |
+| ICM - 1180mm.jfif | ICM | B | 1180 | — | — | — | — | Bordo superiore della fila fuori inquadratura (confermato: la texture arriva fino al bordo della foto senza soluzione di continuità) — non misurabile |
+| c9d645df...jfif (Biellese) | Biellese | BC | 1110 | 1110 (corretta a mano) | — | 165 | 199 | Prima lettura errata (1007,5mm, bordo superiore cliccato male) poi corretta; 170 fogli reali noti da conferma utente |
+| 60038ca9...jfif (Princes) | Princes Ready to Drink | B | — | — | — | — | — | Bordo superiore fuori inquadratura, come ICM |
+
+### Regola pratica emersa: come leggere il "bordo superiore"
+
+Quando la camera non è perfettamente perpendicolare, si vede una sottile fascia
+della superficie superiore del ballotto (in prospettiva) prima del vero taglio
+frontale. Usare il punto **più alto visibile della sagoma del ballotto**
+(non il punto dove inizia la trama frontale verticale) dà risultati migliori:
+su SAMO EB questo ha prodotto un errore di solo 0,6%. Più la foto è vicina
+alla perpendicolare, meno questa scelta influisce e più il risultato è
+affidabile — coerente con quanto raccomandato nella guida allo scatto.
+
+### Conclusione sul metodo per conteggio righe
+
+Su tutti e 4 i casi misurabili finora, il conteggio per righe **sovrastima
+sistematicamente** (dal +17% al +43%). Non è un problema di taratura fine:
+serve rivedere l'algoritmo di rilevamento picchi (probabilmente conta più
+picchi per singolo foglio), non solo i suoi parametri. Il metodo per
+divisione resta l'unico affidabile allo stato attuale, a condizione di
+leggere correttamente l'altezza (foto con camera perpendicolare e bordo
+superiore interamente in inquadratura).
