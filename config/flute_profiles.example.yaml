@@ -1,0 +1,20 @@
+# Copiare questo file in flute_profiles.yaml e compilarlo con le altezze
+# medie MISURATE dal vostro processo (mm), non con valori generici di
+# letteratura: lo spessore reale dipende da fornitore carta, grammatura,
+# umidità e taratura del corrugatore.
+#
+# Chiave: nome/codice del profilo d'onda come lo usate internamente.
+# Valore: altezza media di un singolo foglio ondulato per quel profilo, in mm.
+
+flute_profiles:
+  A: null
+  B: null
+  C: null
+  E: null
+  BC: null
+  # aggiungere qui altri profili/onde doppie usati in ditta
+
+# Soglia di disaccordo (%) tra il metodo per divisione e il metodo per
+# conteggio righe oltre la quale il risultato viene segnalato come a bassa
+# confidenza.
+disagreement_threshold_pct: 10

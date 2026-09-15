@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+config/flute_profiles.yaml
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.png
