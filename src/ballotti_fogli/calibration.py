@@ -149,12 +149,28 @@ def homography_from_quad(
     # verso, altrimenti la corrispondenza tra i punti si "attorciglia" e
     # l'omografia risultante e' invalida (l'errore osservato in fase di
     # test era proprio questo: >25% di errore su distanze note).
+    #
+    # Il primo lato (ordered[0]->ordered[1]) puo' essere sia il lato corto
+    # che quello lungo del riferimento, a seconda di come e' orientato nella
+    # foto (es. A4 orizzontale invece che verticale): va confrontata la sua
+    # lunghezza in pixel con quella del lato successivo per assegnare
+    # correttamente short_side_mm/long_side_mm. Assumere sempre "il primo
+    # lato e' quello corto" e' un bug reale scoperto in fase di test: su un
+    # riferimento ruotato di 90 gradi produceva oltre il 40% di errore.
+    edge_01 = float(np.linalg.norm(ordered[1] - ordered[0]))
+    edge_12 = float(np.linalg.norm(ordered[2] - ordered[1]))
+
+    if edge_01 <= edge_12:
+        first_side_mm, second_side_mm = short_side_mm, long_side_mm
+    else:
+        first_side_mm, second_side_mm = long_side_mm, short_side_mm
+
     dst = np.array(
         [
             [0.0, 0.0],
-            [short_side_mm, 0.0],
-            [short_side_mm, long_side_mm],
-            [0.0, long_side_mm],
+            [first_side_mm, 0.0],
+            [first_side_mm, second_side_mm],
+            [0.0, second_side_mm],
         ],
         dtype=np.float64,
     )

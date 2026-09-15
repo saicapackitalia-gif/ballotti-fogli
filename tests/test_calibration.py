@@ -103,6 +103,27 @@ def test_homography_from_quad_is_robust_to_input_corner_order(index_order):
     assert measured == pytest.approx(800.0, rel=1e-3)
 
 
+def test_homography_from_quad_handles_landscape_reference_orientation():
+    """Regressione: se il riferimento e' fotografato ruotato di 90 gradi
+    (es. A4 orizzontale invece che verticale), il primo lato rilevato dopo
+    l'ordinamento angolare puo' essere quello lungo, non quello corto.
+    Assumerlo sempre corto (bug reale trovato manualmente) dava oltre il 40%
+    di errore su questo identico caso.
+    """
+    a4_landscape_mm = np.array([[0, 0], [297, 0], [297, 210], [0, 210]], dtype=np.float64)
+    top_mm = np.array([[500.0, 50.0]])
+    bottom_mm = np.array([[500.0, 850.0]])
+
+    corners_px = _project(a4_landscape_mm, _TILTED_VIEW)
+    top_px = _project(top_mm, _TILTED_VIEW)[0]
+    bottom_px = _project(bottom_mm, _TILTED_VIEW)[0]
+
+    calib = homography_from_quad(corners_px, short_side_mm=210, long_side_mm=297)
+    measured = calib.distance_mm(tuple(top_px), tuple(bottom_px))
+
+    assert measured == pytest.approx(800.0, rel=1e-3)
+
+
 def test_order_quad_points_returns_four_points():
     pts = np.array([[10, 10], [0, 10], [0, 0], [10, 0]], dtype=np.float64)
     ordered = order_quad_points(pts)
