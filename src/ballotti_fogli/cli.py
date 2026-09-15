@@ -9,7 +9,7 @@ import sys
 import cv2
 import yaml
 
-from .calibration import calibrate_from_reference
+from .calibration import calibrate_from_reference, load_calibration, save_calibration
 from .counting import count_sheets
 
 
@@ -61,10 +61,30 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--ref-length-mm",
         type=float,
-        required=True,
-        help="Lunghezza reale in mm dell'oggetto di riferimento usato per la calibrazione",
+        help="Lunghezza reale in mm dell'oggetto di riferimento (richiesto se non si usa --calibration-file)",
+    )
+    parser.add_argument(
+        "--calibration-file",
+        help=(
+            "Percorso di una calibrazione salvata in precedenza (vedi --save-calibration). "
+            "Da usare SOLO se la foto e' scattata dalla stessa postazione fissa "
+            "(stessa distanza/angolo/zoom) usata per generare quella calibrazione: "
+            "in tal caso salta la selezione manuale del riferimento."
+        ),
+    )
+    parser.add_argument(
+        "--save-calibration",
+        help="Se impostato, salva la calibrazione calcolata da --ref-length-mm in questo file per riusarla in seguito",
     )
     args = parser.parse_args(argv)
+
+    if not args.calibration_file and args.ref_length_mm is None:
+        print(
+            "Errore: specificare --ref-length-mm (calibrazione manuale) oppure "
+            "--calibration-file (postazione fissa gia' calibrata).",
+            file=sys.stderr,
+        )
+        return 1
 
     config = load_flute_profiles(args.profiles_config)
     profiles = config.get("flute_profiles", {})
@@ -85,8 +105,23 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    ref_a, ref_b = _pick_two_points(image, "Calibrazione: click sui 2 estremi del riferimento")
-    calibration = calibrate_from_reference(ref_a, ref_b, args.ref_length_mm)
+    if args.calibration_file:
+        calibration = load_calibration(args.calibration_file)
+        print(
+            f"Uso calibrazione salvata da {args.calibration_file} "
+            f"({calibration.mm_per_px:.5f} mm/pixel). "
+            "Valida solo se la foto e' dalla stessa postazione fissa usata per calibrare."
+        )
+    else:
+        ref_a, ref_b = _pick_two_points(image, "Calibrazione: click sui 2 estremi del riferimento")
+        calibration = calibrate_from_reference(ref_a, ref_b, args.ref_length_mm)
+        if args.save_calibration:
+            save_calibration(
+                calibration,
+                args.save_calibration,
+                notes=f"Calibrato da {args.image} con riferimento di {args.ref_length_mm} mm",
+            )
+            print(f"Calibrazione salvata in {args.save_calibration}")
 
     p_top, p_bottom = _pick_two_points(image, "Fila da contare: click su bordo superiore e inferiore")
 

@@ -4,7 +4,7 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
-config/flute_profiles.yaml
+config/camera_calibration*.yaml
 *.jpg
 *.jpeg
 *.png

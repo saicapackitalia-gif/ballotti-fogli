@@ -6,7 +6,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pytest
 
-from ballotti_fogli.calibration import calibrate_from_reference, distance_px
+from ballotti_fogli.calibration import (
+    calibrate_from_reference,
+    distance_px,
+    load_calibration,
+    save_calibration,
+)
 
 
 def test_distance_px():
@@ -27,3 +32,13 @@ def test_calibrate_rejects_zero_length():
 def test_calibrate_rejects_coincident_points():
     with pytest.raises(ValueError):
         calibrate_from_reference((5, 5), (5, 5), ref_length_mm=50.0)
+
+
+def test_save_and_load_calibration_roundtrip(tmp_path):
+    calib = calibrate_from_reference((0, 0), (200, 0), ref_length_mm=100.0)
+    path = tmp_path / "calibration.yaml"
+
+    save_calibration(calib, str(path), notes="test")
+    loaded = load_calibration(str(path))
+
+    assert loaded.mm_per_px == pytest.approx(calib.mm_per_px)

@@ -1,10 +1,27 @@
-"""Calibrazione pixel -> millimetri a partire da due punti di riferimento
-di lunghezza reale nota (es. estremi di un righello visibile nella foto).
+"""Calibrazione pixel -> millimetri.
+
+Due modalita':
+
+1. ``calibrate_from_reference``: da due punti che delimitano un oggetto di
+   lunghezza reale nota nella foto (es. un righello). Va rifatta ogni volta
+   che cambiano distanza/zoom/angolo della camera rispetto al soggetto.
+
+2. ``save_calibration`` / ``load_calibration``: se la fotocamera e' montata
+   su un supporto fisso a distanza e angolo costanti rispetto al ballotto
+   (es. una staffa/cavalletto), il rapporto mm/pixel calcolato una sola
+   volta resta valido per tutte le foto successive scattate da quella
+   postazione, eliminando il bisogno di un riferimento in ogni scatto.
+   ATTENZIONE: la calibrazione salvata e' valida SOLO se camera, distanza,
+   zoom e inquadratura restano identici a quelli usati per calibrare; uno
+   smartphone tenuto a mano non garantisce questo, quindi questa modalita'
+   richiede un supporto fisico fisso.
 """
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+
+import yaml
 
 
 @dataclass(frozen=True)
@@ -36,3 +53,18 @@ def calibrate_from_reference(
         raise ValueError("I due punti di riferimento coincidono: impossibile calibrare")
 
     return Calibration(mm_per_px=ref_length_mm / px)
+
+
+def save_calibration(calibration: Calibration, path: str, notes: str | None = None) -> None:
+    """Salva la calibrazione su file YAML per riutilizzarla su foto successive
+    scattate dalla stessa postazione fissa (stessa distanza/angolo/zoom).
+    """
+    data = {**asdict(calibration), "notes": notes}
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+
+
+def load_calibration(path: str) -> Calibration:
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return Calibration(mm_per_px=float(data["mm_per_px"]))

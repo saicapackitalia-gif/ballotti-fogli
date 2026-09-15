@@ -1,0 +1,11 @@
+# Altezze medie misurate per profilo d'onda (mm per singolo foglio ondulato),
+# fornite dall'azienda per l'uso con questo prototipo.
+
+flute_profiles:
+  B: 2.87
+  E: 1.64
+  C: 4.1
+  EB: 4.26
+  BC: 6.73
+
+disagreement_threshold_pct: 10

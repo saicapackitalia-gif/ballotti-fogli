@@ -36,6 +36,55 @@ Questo prototipo implementa **entrambi** e li confronta: se i due valori
 sono in disaccordo oltre una soglia, l'app segnala bassa confidenza invece di
 restituire un numero silenziosamente sbagliato.
 
+## 1bis. "Punto la fotocamera e basta, il sistema capisce l'altezza da solo?"
+
+**Risposta diretta: no, non da una singola foto scattata a mano libera a
+distanza/angolo qualsiasi.** Una fotocamera 2D non ha modo di sapere quanti
+millimetri reali corrisponde un pixel se non conosce almeno uno tra: la
+distanza dal soggetto + i parametri ottici della camera (lunghezza focale,
+dimensione sensore), oppure un oggetto di dimensione nota nell'inquadratura,
+oppure un sensore di profondità. Senza uno di questi, "20 cm di ballotto" e
+"2 metri di ballotto fotografati da più lontano" producono la stessa
+immagine.
+
+Opzioni concrete, in ordine di praticità per un contesto industriale:
+
+1. **Postazione fissa (consigliata)** — montare il telefono su una staffa/
+   cavalletto a distanza e angolo costanti dal ballotto. Si calibra
+   **una sola volta** (foto con un riferimento noto, es. un righello) e da
+   quel momento ogni foto scattata dalla stessa postazione riusa lo stesso
+   rapporto mm/pixel, **senza bisogno di riferimento ad ogni scatto**. È
+   l'opzione più economica e affidabile, ed è già supportata nel prototipo
+   (vedi `--save-calibration` / `--calibration-file` in §6). Limite: se
+   qualcuno sposta il telefono, cambia lo zoom o l'inquadratura, la
+   calibrazione salvata non è più valida e va rifatta.
+
+2. **Riferimento fisso nell'inquadratura, rilevato automaticamente** — es.
+   un marker stampato (tipo ArUco/QR) attaccato vicino al ballotto,
+   rilevato via software invece che cliccato a mano. Toglie il click
+   manuale ma richiede comunque un oggetto fisico di riferimento in ogni
+   foto; non è ancora implementato in questo prototipo (vedi §7).
+
+3. **API di realtà aumentata dello smartphone (ARKit su iOS, ARCore su
+   Android)** — usano fusione di camera + sensori di movimento (e, sugli
+   iPhone Pro con LiDAR, un sensore di profondità dedicato) per stimare
+   distanze reali senza marker fisico. Precisione: buona (ordine del mm-cm)
+   sui modelli con LiDAR, più incerta (cm) sui modelli che usano solo
+   visual-inertial odometry. Richiede però di sviluppare un'app nativa
+   (Swift/Kotlin) invece di un semplice upload foto, quindi è un impegno
+   di sviluppo maggiore rispetto alle opzioni 1-2.
+
+4. **Dimensione nota e costante del ballotto/pallet stesso** (es. se i
+   pallet o la larghezza di taglio dei fogli sono sempre standard in
+   azienda) — si potrebbe usare quella dimensione orizzontale come
+   riferimento implicito invece di un marker fisico. Fattibile ma dipende
+   dal fatto che quella dimensione sia davvero sempre costante e ben
+   visibile nella foto.
+
+**Raccomandazione pratica**: per un primo rollout in produzione, l'opzione 1
+(postazione fissa con calibrazione una tantum) dà il miglior rapporto tra
+affidabilità e sforzo di sviluppo, ed è quella già cablata nel prototipo.
+
 ## 2. Requisiti indispensabili per un risultato utilizzabile
 
 - **Riferimento di scala nella foto**: un oggetto di lunghezza nota (righello,
@@ -45,15 +94,11 @@ restituire un numero silenziosamente sbagliato.
   (foto in diagonale) distorce le distanze e introduce errore sistematico.
 - **Illuminazione uniforme e messa a fuoco**: ombre dure o foto mosse
   peggiorano molto il metodo per conteggio righe.
-- **Altezze medie per profilo d'onda misurate da voi** (come indicato):
-  vanno inserite in `config/flute_profiles.yaml`. Il repository **non**
-  contiene valori numerici precompilati: i valori di spessore onda variano
-  per fornitore carta, grammatura, umidità e taratura del corrugatore, quindi
-  usare valori di letteratura generici invece dei vostri dati misurati
-  sarebbe un errore. (Per riferimento, in letteratura tecnica FEFCO si
-  citano ordini di grandezza indicativi tipo: onda A ~4-5 mm, B ~2-3 mm,
-  C ~3,5-4 mm, E ~1,5 mm, F/N <1 mm — ma sono range generici, **non dati da
-  usare al posto dei vostri**.)
+- **Altezze medie per profilo d'onda misurate da voi**: già inserite in
+  `config/flute_profiles.yaml` con i valori forniti (B 2,87 mm, E 1,64 mm,
+  C 4,1 mm, EB 4,26 mm, BC 6,73 mm — per foglio). Sono dati vostri, non di
+  letteratura: aggiornateli se cambiano fornitore carta, grammatura o
+  taratura del corrugatore.
 
 ## 3. Come è strutturato il prototipo
 
@@ -99,13 +144,14 @@ pip install -r requirements.txt
 
 ## 6. Uso (prototipo a riga di comando)
 
-```bash
-cp config/flute_profiles.example.yaml config/flute_profiles.yaml
-# modificate config/flute_profiles.yaml con le VOSTRE altezze medie misurate
+`config/flute_profiles.yaml` contiene già le altezze medie fornite
+dall'azienda (B, E, C, EB, BC); aggiornatelo se cambiano.
 
+### Modalità A — calibrazione manuale ad ogni foto
+
+```bash
 python -m ballotti_fogli.cli foto_ballotto.jpg \
     --profile C \
-    --profiles-config config/flute_profiles.yaml \
     --ref-length-mm 100
 ```
 
@@ -115,9 +161,35 @@ Lo script apre due finestre interattive:
 2. cliccate il punto in alto e il punto in basso della fila di fogli da
    contare.
 
-L'output riporta: altezza stimata in mm, stima per divisione, stima per
-conteggio righe, ed eventuale avviso di bassa confidenza se le due stime
-divergono oltre la soglia (default 10%, configurabile).
+### Modalità B — postazione fissa (consigliata, niente riferimento ad ogni scatto)
+
+Calibrazione una tantum, da rifare solo se si sposta la fotocamera:
+
+```bash
+python -m ballotti_fogli.cli foto_calibrazione.jpg \
+    --profile C \
+    --ref-length-mm 100 \
+    --save-calibration config/camera_calibration.yaml
+```
+
+Da quel momento, per ogni nuova foto scattata dalla stessa postazione fissa
+(stessa distanza/angolo/zoom):
+
+```bash
+python -m ballotti_fogli.cli foto_ballotto.jpg \
+    --profile C \
+    --calibration-file config/camera_calibration.yaml
+```
+
+Verrà chiesto solo il click su bordo superiore e inferiore della fila, non
+più il riferimento di calibrazione.
+
+### Output
+
+In entrambi i casi l'output riporta: altezza stimata in mm, stima per
+divisione, stima per conteggio righe, ed eventuale avviso di bassa
+confidenza se le due stime divergono oltre la soglia (default 10%,
+configurabile in `flute_profiles.yaml`).
 
 ## 7. Prossimi passi ragionevoli
 
