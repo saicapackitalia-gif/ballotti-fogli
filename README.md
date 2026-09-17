@@ -291,6 +291,16 @@ divisione, stima per conteggio righe, ed eventuale avviso di bassa
 confidenza se le due stime divergono oltre la soglia (default 10%,
 configurabile in `flute_profiles.yaml`).
 
+## 6bis. App web per telefono (senza Python)
+
+`web/conta-fogli.html` è una versione della stessa logica (calibrazione +
+conteggio per divisione) che gira nel browser del telefono, senza bisogno
+di installare Python. Vedi `web/README.md` per uso e limiti — in
+particolare: calibrazione scalare semplice (non corregge foto storte come
+la modalità `--auto-a4` di questo prototipo) e un aggancio automatico al
+bordo sperimentale, disattivato di default perché si è dimostrato capace
+di agganciarsi al bordo sbagliato su un test reale.
+
 ## 7. Prossimi passi ragionevoli
 
 1. Raccogliere un set di foto reali con conteggio manuale noto (ground
